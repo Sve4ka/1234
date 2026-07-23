@@ -153,13 +153,15 @@ def save_predictions(
             values = [
                 (
                     str(upload_id),
-                    prediction["student_id"],
-                    prediction["student_name"],
-                    prediction["predicted_class"],
-                    prediction["probability_0"],
-                    prediction["probability_1"],
-                    prediction["probability_2"],
-                    prediction["probability_3_plus"],
+                    str(prediction["student_hash"]),
+                    str(prediction["record_number"]),
+                    str(prediction["predicted_class"]),
+                    float(prediction["probability_0"]),
+                    float(prediction["probability_1"]),
+                    float(prediction["probability_2"]),
+                    float(
+                        prediction["probability_3_plus"]
+                    ),
                 )
                 for prediction in predictions
             ]
@@ -170,8 +172,8 @@ def save_predictions(
                     """
                     INSERT INTO predictions (
                         upload_id,
-                        student_id,
-                        student_name,
+                        student_hash,
+                        record_number,
                         predicted_class,
                         probability_0,
                         probability_1,
@@ -205,8 +207,8 @@ def get_predictions(
             cursor.execute(
                 """
                 SELECT
-                    student_id,
-                    student_name,
+                    student_hash,
+                    record_number,
                     predicted_class,
                     probability_0,
                     probability_1,
@@ -216,9 +218,10 @@ def get_predictions(
                 WHERE upload_id = %s
                 ORDER BY
                     CASE predicted_class
-                        WHEN '3+' THEN 3
-                        WHEN '2' THEN 2
-                        WHEN '1' THEN 1
+                        WHEN '3+' THEN 4
+                        WHEN '2' THEN 3
+                        WHEN '1' THEN 2
+                        WHEN '0' THEN 1
                         ELSE 0
                     END DESC,
                     probability_3_plus DESC,
@@ -228,14 +231,14 @@ def get_predictions(
                 (str(upload_id),),
             )
 
-            predictions = cursor.fetchall()
+            rows = cursor.fetchall()
 
     finally:
         connection.close()
 
     return [
-        dict(prediction)
-        for prediction in predictions
+        dict(row)
+        for row in rows
     ]
 
 
