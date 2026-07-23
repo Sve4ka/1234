@@ -90,59 +90,6 @@ def run_migrations() -> None:
                 """
             )
 
-            # Переименование старых колонок для уже существующей БД.
-            cursor.execute(
-                """
-                DO $$
-                BEGIN
-                    IF EXISTS (
-                        SELECT 1
-                        FROM information_schema.columns
-                        WHERE table_name = 'predictions'
-                          AND column_name = 'student_id'
-                    )
-                    AND NOT EXISTS (
-                        SELECT 1
-                        FROM information_schema.columns
-                        WHERE table_name = 'predictions'
-                          AND column_name = 'student_hash'
-                    )
-                    THEN
-                        ALTER TABLE predictions
-                            RENAME COLUMN student_id
-                            TO student_hash;
-                    END IF;
-                END
-                $$;
-                """
-            )
-
-            cursor.execute(
-                """
-                DO $$
-                BEGIN
-                    IF EXISTS (
-                        SELECT 1
-                        FROM information_schema.columns
-                        WHERE table_name = 'predictions'
-                          AND column_name = 'student_name'
-                    )
-                    AND NOT EXISTS (
-                        SELECT 1
-                        FROM information_schema.columns
-                        WHERE table_name = 'predictions'
-                          AND column_name = 'record_number'
-                    )
-                    THEN
-                        ALTER TABLE predictions
-                            RENAME COLUMN student_name
-                            TO record_number;
-                    END IF;
-                END
-                $$;
-                """
-            )
-
             cursor.execute(
                 """
                 CREATE INDEX IF NOT EXISTS

@@ -87,7 +87,7 @@
   /**
    * Fetch с таймаутом и обработкой offline
    */
-  window.fetchWithTimeout = async function(url, options = {}, timeout = 30000) {
+  window.fetchWithTimeout = async function(url, options = {}, timeout = 300000) {
     // Проверка соединения
     if (!navigator.onLine) {
       throw new Error('Нет подключения к интернету. Проверьте сеть и попробуйте снова.');

@@ -21,7 +21,6 @@ from backend.db.db import (
 from backend.db.migration import run_migrations
 from src.predict import run_inference
 
-
 app = FastAPI(
     title="Academic Debt Prediction API",
     version="1.0.0",
@@ -29,17 +28,11 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5500",
-        "http://127.0.0.1:5500",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 MOCK_RESPONSE = {
     "status": "completed",
@@ -89,7 +82,7 @@ def health() -> dict:
 
 @app.post("/upload")
 def upload_file(
-    file: UploadFile = File(...),
+        file: UploadFile = File(...),
 ) -> dict:
     if not file.filename:
         raise HTTPException(
@@ -142,8 +135,8 @@ def upload_file(
         }
 
         missing_columns = (
-            required_columns
-            - set(dataframe.columns)
+                required_columns
+                - set(dataframe.columns)
         )
 
         if missing_columns:
@@ -177,7 +170,7 @@ def upload_file(
 
 @app.get("/uploads/{upload_id}")
 def upload_info(
-    upload_id: UUID,
+        upload_id: UUID,
 ) -> dict:
     upload = get_upload(upload_id)
 
@@ -196,7 +189,7 @@ def predict_mock() -> dict:
 
 
 def validate_predictions(
-    predictions: list[dict],
+        predictions: list[dict],
 ) -> None:
     required_fields = {
         "student_hash",
@@ -227,8 +220,8 @@ def validate_predictions(
             )
 
         missing_fields = (
-            required_fields
-            - set(prediction)
+                required_fields
+                - set(prediction)
         )
 
         if missing_fields:
@@ -267,10 +260,10 @@ def validate_predictions(
         probability_sum = 0.0
 
         for field in (
-            "probability_0",
-            "probability_1",
-            "probability_2",
-            "probability_3_plus",
+                "probability_0",
+                "probability_1",
+                "probability_2",
+                "probability_3_plus",
         ):
             value = float(prediction[field])
 
@@ -289,8 +282,8 @@ def validate_predictions(
 
 
 def prepare_predictions(
-    result: pd.DataFrame,
-    source_dataframe: pd.DataFrame,
+        result: pd.DataFrame,
+        source_dataframe: pd.DataFrame,
 ) -> list[dict]:
     required_ml_columns = {
         "hash",
@@ -302,8 +295,8 @@ def prepare_predictions(
     }
 
     missing_ml_columns = (
-        required_ml_columns
-        - set(result.columns)
+            required_ml_columns
+            - set(result.columns)
     )
 
     if missing_ml_columns:
@@ -318,8 +311,8 @@ def prepare_predictions(
     }
 
     missing_source_columns = (
-        required_source_columns
-        - set(source_dataframe.columns)
+            required_source_columns
+            - set(source_dataframe.columns)
     )
 
     if missing_source_columns:
@@ -378,8 +371,8 @@ def prepare_predictions(
     )
 
     missing_record_numbers = merged_result[
-        "Номер ЛД"
-    ].isna() | merged_result["Номер ЛД"].eq("")
+                                 "Номер ЛД"
+                             ].isna() | merged_result["Номер ЛД"].eq("")
 
     if missing_record_numbers.any():
         missing_hashes = (
@@ -455,7 +448,7 @@ def prepare_predictions(
 
 @app.post("/predict/{upload_id}")
 def predict(
-    upload_id: UUID,
+        upload_id: UUID,
 ) -> dict:
     upload = get_upload(upload_id)
 
@@ -472,8 +465,8 @@ def predict(
         )
 
     file_path = (
-        UPLOAD_DIR
-        / upload["stored_filename"]
+            UPLOAD_DIR
+            / upload["stored_filename"]
     )
 
     if not file_path.exists():
@@ -540,7 +533,7 @@ def predict(
 
 @app.get("/predictions/{upload_id}")
 def predictions(
-    upload_id: UUID,
+        upload_id: UUID,
 ) -> dict:
     upload = get_upload(upload_id)
 
@@ -622,7 +615,7 @@ def export_mock() -> FileResponse:
 
 @app.get("/export")
 def export_predictions(
-    upload_id: UUID,
+        upload_id: UUID,
 ) -> FileResponse:
     upload = get_upload(upload_id)
 
@@ -684,8 +677,8 @@ def export_predictions(
     )
 
     result_path = (
-        UPLOAD_DIR
-        / result_filename
+            UPLOAD_DIR
+            / result_filename
     )
 
     try:
