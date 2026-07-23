@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Статистика предсказаний</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0f0e17;
+      color: #e0e0e0;
+      min-height: 100vh;
+      opacity: 0;
+      animation: fadeIn 0.5s ease forwards;
+    }
+
+    @keyframes fadeIn { to { opacity: 1; } }
+
+    .navbar {
+      background: #1a1932;
+      border-bottom: 1px solid #2a2950;
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      height: 60px;
+      gap: 8px;
+    }
+
+    .navbar .logo { font-size: 20px; font-weight: 700; color: #7f5af0; margin-right: 40px; }
+    .navbar a {
+      color: #94a1b2; text-decoration: none; padding: 8px 18px;
+      border-radius: 8px; font-size: 14px; font-weight: 500; transition: all 0.2s;
+    }
+    .navbar a:hover { background: #2a2950; color: #e0e0e0; }
+    .navbar a.active { background: #7f5af0; color: #fff; }
+
+    .container { max-width: 1280px; margin: 0 auto; padding: 32px 24px; }
+    .page-header { margin-bottom: 28px; }
+    .page-header h1 { font-size: 26px; color: #fffffe; margin-bottom: 6px; }
+    .page-header p { color: #94a1b2; font-size: 14px; }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .kpi-card {
+      background: #1a1932;
+      border: 1px solid #2a2950;
+      border-radius: 14px;
+      padding: 22px;
+      position: relative;
+      overflow: hidden;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: cardIn 0.5s ease forwards;
+    }
+
+    .kpi-card:nth-child(1) { animation-delay: 0.1s; }
+    .kpi-card:nth-child(2) { animation-delay: 0.2s; }
+    .kpi-card:nth-child(3) { animation-delay: 0.3s; }
+    .kpi-card:nth-child(4) { animation-delay: 0.4s; }
+    .kpi-card:nth-child(5) { animation-delay: 0.5s; }
+    .kpi-card:nth-child(6) { animation-delay: 0.6s; }
+
+    @keyframes cardIn {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .kpi-card::before {
+      content: ''; position: absolute; top: 0; left: 0;
+      width: 100%; height: 3px;
+    }
+    .kpi-card:nth-child(1)::before { background: #7f5af0; }
+    .kpi-card:nth-child(2)::before { background: #34d399; }
+    .kpi-card:nth-child(3)::before { background: #fbbf24; }
+    .kpi-card:nth-child(4)::before { background: #f87171; }
+    .kpi-card:nth-child(5)::before { background: #38bdf8; }
+    .kpi-card:nth-child(6)::before { background: #a78bfa; }
+
+    .kpi-label { font-size: 12px; color: #94a1b2; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px; }
+    .kpi-value { font-size: 32px; font-weight: 700; color: #fffffe; }
+    .kpi-sub { font-size: 12px; color: #94a1b2; margin-top: 4px; }
+
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+
+    .chart-card {
+      background: #1a1932;
+      border: 1px solid #2a2950;
+      border-radius: 14px;
+      padding: 24px;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: cardIn 0.5s ease forwards;
+    }
+
+    .chart-card:nth-child(1) { animation-delay: 0.2s; }
+    .chart-card:nth-child(2) { animation-delay: 0.3s; }
+    .chart-card:nth-child(3) { animation-delay: 0.4s; }
+    .chart-card:nth-child(4) { animation-delay: 0.5s; }
+    .chart-card:nth-child(5) { animation-delay: 0.6s; }
+    .chart-card:nth-child(6) { animation-delay: 0.7s; }
+
+    .chart-card.full-width { grid-column: 1 / -1; }
+    .chart-card h3 { font-size: 15px; color: #fffffe; margin-bottom: 4px; }
+    .chart-card .chart-desc { font-size: 12px; color: #94a1b2; margin-bottom: 20px; }
+    .chart-container { position: relative; width: 100%; max-height: 320px; }
+    .chart-container.tall { max-height: 400px; }
+
+    .chart-skeleton {
+      height: 300px;
+      background: linear-gradient(90deg, #22214a 25%, #2a2950 50%, #22214a 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 8px;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .empty-state {
+      padding: 60px 20px;
+      text-align: center;
+      grid-column: 1 / -1;
+    }
+    .empty-state-icon { font-size: 64px; margin-bottom: 16px; }
+    .empty-state-title { font-size: 20px; color: #fffffe; margin-bottom: 8px; }
+    .empty-state-desc { color: #94a1b2; font-size: 14px; }
+
+    .heatmap-container {
+      display: grid;
+      grid-template-columns: 140px repeat(5, 1fr);
+      gap: 4px;
+      margin-top: 10px;
+    }
+
+    .heatmap-cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 8px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #fffffe;
+      transition: transform 0.2s, box-shadow 0.2s;
+      cursor: default;
+    }
+
+    .heatmap-cell:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      z-index: 2;
+    }
+
+    .heatmap-label-y {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #e0e0e0;
+    }
+
+    .heatmap-label-x {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding-top: 8px;
+      font-size: 11px;
+      color: #94a1b2;
+      font-weight: 500;
+    }
+
+    .heatmap-empty { background: transparent; }
+
+    .heatmap-legend {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 16px;
+      font-size: 12px;
+      color: #94a1b2;
+    }
+
+    .legend-gradient {
+      width: 200px;
+      height: 10px;
+      border-radius: 5px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.8) 100%);
+    }
+
+    #toast-container {
+      position: fixed; top: 20px; right: 20px; z-index: 10000;
+      display: flex; flex-direction: column; gap: 10px; max-width: 400px;
+    }
+    .toast {
+      display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px;
+      background: #1a1932; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      border-left: 4px solid #7f5af0; transform: translateX(120%); opacity: 0;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .toast-show { transform: translateX(0); opacity: 1; }
+    .toast-removing { transform: translateX(120%); opacity: 0; }
+    .toast-success { border-left-color: #34d399; }
+    .toast-error { border-left-color: #f87171; }
+    .toast-warning { border-left-color: #fbbf24; }
+    .toast-info { border-left-color: #7f5af0; }
+    .toast-icon { font-size: 20px; }
+    .toast-content { flex: 1; }
+    .toast-title { font-weight: 600; font-size: 14px; color: #fffffe; margin-bottom: 2px; }
+    .toast-message { font-size: 13px; color: #94a1b2; }
+    .toast-close { background: none; border: none; color: #94a1b2; font-size: 16px; cursor: pointer; }
+    .toast-close:hover { color: #fffffe; }
+
+    #offline-indicator {
+      position: fixed; top: 0; left: 0; width: 100%; padding: 10px;
+      background: #fbbf24; color: #000; text-align: center;
+      font-size: 14px; font-weight: 600; z-index: 9998;
+      transform: translateY(-100%); transition: transform 0.3s ease;
+    }
+    #offline-indicator.visible { transform: translateY(0); }
+
+    @media (max-width: 768px) {
+      .charts-grid { grid-template-columns: 1fr; }
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      .heatmap-container { grid-template-columns: 100px repeat(5, 1fr); overflow-x: auto; }
+      #toast-container { left: 10px; right: 10px; max-width: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="logo"> EduPredict</div>
+    <a href="results.html">Результаты</a>
+    <a href="statistics.html" class="active">Статистика</a>
+  </nav>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>Аналитика и статистика</h1>
+      <p class="page-header">Визуализация распределения задолженностей и уверенности модели</p>
+    </div>
+
+    <div class="kpi-grid" id="kpi-grid"></div>
+
+    <div class="charts-grid" id="charts-grid">
+      <div class="chart-skeleton" style="grid-column: 1 / -1; height: 200px;"></div>
+    </div>
+  </div>
+
+  <script src="js/toast.js"></script>
+  <script src="js/utils.js"></script>
+
+  <script>
+    let data = [];
+
+    setTimeout(() => {
+      try {
+        const raw = localStorage.getItem('predictionData');
+        if (!raw) {
+          document.getElementById('charts-grid').innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon">📭</div>
+              <div class="empty-state-title">Нет данных</div>
+              <div class="empty-state-desc">Загрузите файл и запустите предсказание на главной странице</div>
+            </div>
+          `;
+          showToast('Нет данных для анализа', 'warning', 4000);
+          return;
+        }
+
+        data = JSON.parse(raw);
+
+        if (!Array.isArray(data) || data.length === 0) {
+          document.getElementById('charts-grid').innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon">⚠️</div>
+              <div class="empty-state-title">Некорректные данные</div>
+              <div class="empty-state-desc">Данные не прошли валидацию</div>
+            </div>
+          `;
+          return;
+        }
+
+        renderAll();
+      } catch (e) {
+        console.error(e);
+        document.getElementById('charts-grid').innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">💥</div>
+            <div class="empty-state-title">Ошибка загрузки</div>
+            <div class="empty-state-desc">Не удалось прочитать данные</div>
+          </div>
+        `;
+        showToast('Ошибка при загрузке данных', 'error', 5000);
+      }
+    }, 600);
+
+    function renderAll() {
+      renderKPI();
+      renderHeatmap();
+    }
+
+    function renderKPI() {
+      const total = data.length;
+      const debtCounts = [0, 0, 0, 0];
+      data.forEach(d => debtCounts[Math.min(d.debt, 3)]++);
+      
+      const noDebt = debtCounts[0];
+      const noDebtPct = ((noDebt / total) * 100).toFixed(1);
+      const riskCount = debtCounts[2] + debtCounts[3];
+      const riskPct = ((riskCount / total) * 100).toFixed(1);
+      const criticalCount = debtCounts[3];
+      const criticalPct = ((criticalCount / total) * 100).toFixed(1);
+
+      const avgDebt = (data.reduce((s, d) => s + Math.min(d.debt, 3), 0) / total).toFixed(2);
+
+      const avgConfidence = (data.reduce((s, d) => {
+        const probs = [d.probability_0, d.probability_1, d.probability_2, d.probability_3_plus];
+        return s + Math.max(...probs);
+      }, 0) / total * 100).toFixed(1);
+
+      const kpis = [
+        { label: 'Всего записей', value: total, sub: 'студентов в выборке' },
+        { label: 'Без долгов', value: `${noDebtPct}%`, sub: `${noDebt} студентов` },
+        { label: 'Средний долг', value: avgDebt, sub: 'на одного студента' },
+        { label: 'В зоне риска', value: `${riskPct}%`, sub: `${riskCount} с 2+ долгами` },
+        { label: 'Критическая группа', value: `${criticalPct}%`, sub: `${criticalCount} с 3+ долгами` },
+        { label: 'Уверенность модели', value: `${avgConfidence}%`, sub: 'средняя максимальная вероятность' },
+      ];
+      
+      const kpiGrid = document.getElementById('kpi-grid');
+      kpiGrid.innerHTML = '';
+      
+      kpis.forEach(kpi => {
+        kpiGrid.innerHTML += `
+          <div class="kpi-card">
+            <div class="kpi-label">${kpi.label}</div>
+            <div class="kpi-value">${kpi.value}</div>
+            <div class="kpi-sub">${kpi.sub}</div>
+          </div>
+        `;
+      });
+    }
+
+    function renderHeatmap() {
+      const grid = document.getElementById('charts-grid');
+      grid.innerHTML = '';
+
+      // Heatmap: Predicted Class × Probability Range
+      const probRanges = [
+        { label: 'P<0.3', min: 0, max: 0.3 },
+        { label: '0.3–0.5', min: 0.3, max: 0.5 },
+        { label: '0.5–0.7', min: 0.5, max: 0.7 },
+        { label: '0.7–0.9', min: 0.7, max: 0.9 },
+        { label: 'P≥0.9', min: 0.9, max: 1.01 },
+      ];
+
+      const debtLevels = [
+        { level: 3, label: '3+ долга', color: '248, 113, 113' },
+        { level: 2, label: '2 долга', color: '251, 146, 60' },
+        { level: 1, label: '1 долг', color: '251, 191, 36' },
+        { level: 0, label: '0 долгов', color: '52, 211, 153' }
+      ];
+
+      const counts = {};
+      debtLevels.forEach(d => {
+        counts[d.level] = {};
+        probRanges.forEach(p => counts[d.level][p.label] = 0);
+      });
+
+      data.forEach(item => {
+        const debtKey = Math.min(item.debt, 3);
+        const maxProb = Math.max(item.probability_0, item.probability_1, item.probability_2, item.probability_3_plus);
+        for (const p of probRanges) {
+          if (maxProb >= p.min && maxProb < p.max) {
+            counts[debtKey][p.label]++;
+            break;
+          }
+        }
+      });
+
+      const maxInRow = {};
+      debtLevels.forEach(d => {
+        maxInRow[d.level] = Math.max(...probRanges.map(p => counts[d.level][p.label]));
+      });
+
+      let html = `
+        <div class="chart-card full-width">
+          <h3>Тепловая карта: Прогноз × Уверенность модели</h3>
+          <p class="chart-desc">Распределение студентов по predicted class и максимальной вероятности (уверенности модели)</p>
+          <div class="heatmap-container" id="risk-heatmap">
+            <div class="heatmap-empty"></div>
+      `;
+
+      probRanges.forEach(p => {
+        html += `<div class="heatmap-label-x">${p.label}</div>`;
+      });
+
+      debtLevels.forEach(debt => {
+        html += `<div class="heatmap-label-y">${debt.label}</div>`;
+        probRanges.forEach(p => {
+          const count = counts[debt.level][p.label];
+          const max = maxInRow[debt.level];
+          const intensity = max > 0 ? (count / max) : 0;
+          const alpha = 0.15 + (intensity * 0.75);
+          const bgColor = `rgba(${debt.color}, ${alpha})`;
+          const textColor = intensity > 0.4 ? '#fffffe' : 'rgba(255,255,255,0.5)';
+          html += `<div class="heatmap-cell" style="background-color: ${bgColor}; color: ${textColor};" title="${debt.label}, ${p.label}: ${count} чел.">${count}</div>`;
+        });
+      });
+
+      html += `
+          </div>
+          <div class="heatmap-legend">
+            <span>Меньше</span>
+            <div class="legend-gradient"></div>
+            <span>Больше</span>
+          </div>
+        </div>
+      `;
+
+      grid.innerHTML = html;
+    }
+
+    setupOfflineIndicator();
+  </script>
+</body>
+</html>

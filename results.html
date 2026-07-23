@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Результаты предсказаний</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0f0e17;
+      color: #e0e0e0;
+      min-height: 100vh;
+      opacity: 0;
+      animation: fadeIn 0.5s ease forwards;
+    }
+
+    @keyframes fadeIn { to { opacity: 1; } }
+
+    .navbar {
+      background: #1a1932;
+      border-bottom: 1px solid #2a2950;
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      height: 60px;
+      gap: 8px;
+    }
+
+    .navbar .logo { font-size: 20px; font-weight: 700; color: #7f5af0; margin-right: 40px; }
+    .navbar a {
+      color: #94a1b2; text-decoration: none; padding: 8px 18px;
+      border-radius: 8px; font-size: 14px; font-weight: 500; transition: all 0.2s;
+    }
+    .navbar a:hover { background: #2a2950; color: #e0e0e0; }
+    .navbar a.active { background: #7f5af0; color: #fff; }
+
+    .container { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+    .page-header { margin-bottom: 28px; }
+    .page-header h1 { font-size: 26px; color: #fffffe; margin-bottom: 6px; }
+    .page-header p { color: #94a1b2; font-size: 14px; }
+
+    .filters-bar {
+      display: flex; gap: 12px; flex-wrap: wrap;
+      margin-bottom: 20px; align-items: center;
+    }
+
+    .search-box { position: relative; flex: 1; min-width: 220px; }
+    .search-box input {
+      width: 100%; padding: 10px 14px 10px 38px;
+      background: #1a1932; border: 1px solid #2a2950;
+      border-radius: 10px; color: #e0e0e0; font-size: 14px; outline: none;
+      transition: border-color 0.2s;
+    }
+    .search-box input:focus { border-color: #7f5af0; }
+    .search-box::before {
+      content: '🔍'; position: absolute; left: 12px;
+      top: 50%; transform: translateY(-50%);
+    }
+
+    .filter-select {
+      padding: 10px 14px; background: #1a1932;
+      border: 1px solid #2a2950; border-radius: 10px;
+      color: #e0e0e0; font-size: 14px; outline: none;
+      cursor: pointer; min-width: 160px;
+    }
+    .filter-select:focus { border-color: #7f5af0; }
+    .filter-select option { background: #1a1932; }
+
+    .table-card {
+      background: #1a1932; border-radius: 14px;
+      border: 1px solid #2a2950; overflow: hidden;
+    }
+
+    .table-wrapper { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+
+    thead th {
+      background: #16152b; padding: 14px 20px; text-align: left;
+      font-size: 12px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.8px; color: #94a1b2; border-bottom: 1px solid #2a2950;
+      cursor: pointer; user-select: none; white-space: nowrap; transition: color 0.2s;
+    }
+    thead th:hover { color: #7f5af0; }
+    thead th .sort-icon { margin-left: 6px; font-size: 10px; opacity: 0.4; }
+    thead th.sorted .sort-icon { opacity: 1; color: #7f5af0; }
+
+    tbody tr { border-bottom: 1px solid #222145; transition: background 0.15s; }
+    tbody tr:hover { background: #22214a; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody td { padding: 13px 20px; font-size: 14px; white-space: nowrap; }
+
+    .hash-cell { font-family: 'Courier New', monospace; color: #a78bfa; font-size: 13px; }
+    .record-cell { color: #fffffe; font-weight: 500; }
+
+    .debt-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      padding: 4px 14px; border-radius: 20px; font-size: 13px;
+      font-weight: 700; min-width: 52px;
+    }
+    .debt-0 { background: #064e3b; color: #34d399; }
+    .debt-1 { background: #713f12; color: #fbbf24; }
+    .debt-2 { background: #7c2d12; color: #fb923c; }
+    .debt-3 { background: #7f1d1d; color: #f87171; }
+
+    .table-footer {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 14px 20px; border-top: 1px solid #2a2950;
+      font-size: 13px; color: #94a1b2;
+    }
+
+    .pagination { display: flex; gap: 4px; }
+    .pagination button {
+      background: #22214a; border: 1px solid #2a2950;
+      color: #94a1b2; padding: 6px 12px; border-radius: 8px;
+      cursor: pointer; font-size: 13px; transition: all 0.2s;
+    }
+    .pagination button:hover:not(:disabled) { background: #7f5af0; color: #fff; border-color: #7f5af0; }
+    .pagination button.active { background: #7f5af0; color: #fff; border-color: #7f5af0; }
+    .pagination button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .actions-bar {
+      display: flex; justify-content: flex-end;
+      margin-bottom: 16px; gap: 10px;
+    }
+
+    .btn {
+      padding: 10px 20px; border: none; border-radius: 10px;
+      font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-primary { background: #7f5af0; color: #fff; }
+    .btn-primary:hover { background: #6b46e5; transform: translateY(-1px); }
+    .btn-outline { background: transparent; color: #7f5af0; border: 1px solid #7f5af0; }
+    .btn-outline:hover { background: #7f5af020; }
+
+    .skeleton-row {
+      display: flex; gap: 12px; padding: 14px 20px; border-bottom: 1px solid #222145;
+    }
+    .skeleton-cell {
+      height: 16px; background: linear-gradient(90deg, #22214a 25%, #2a2950 50%, #22214a 75%);
+      background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px; flex: 1;
+    }
+    .skeleton-cell:nth-child(1) { flex: 0.3; }
+    .skeleton-cell:nth-child(2) { flex: 1.2; }
+    .skeleton-cell:nth-child(3) { flex: 0.8; }
+    .skeleton-cell:nth-child(4) { flex: 0.6; }
+
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .empty-state { padding: 60px 20px; text-align: center; }
+    .empty-state-icon { font-size: 64px; margin-bottom: 16px; }
+    .empty-state-title { font-size: 20px; color: #fffffe; margin-bottom: 8px; }
+    .empty-state-desc { color: #94a1b2; font-size: 14px; }
+
+    #toast-container {
+      position: fixed; top: 20px; right: 20px; z-index: 10000;
+      display: flex; flex-direction: column; gap: 10px; max-width: 400px;
+    }
+    .toast {
+      display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px;
+      background: #1a1932; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      border-left: 4px solid #7f5af0; transform: translateX(120%); opacity: 0;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .toast-show { transform: translateX(0); opacity: 1; }
+    .toast-removing { transform: translateX(120%); opacity: 0; }
+    .toast-success { border-left-color: #34d399; }
+    .toast-error { border-left-color: #f87171; }
+    .toast-warning { border-left-color: #fbbf24; }
+    .toast-info { border-left-color: #7f5af0; }
+    .toast-icon { font-size: 20px; }
+    .toast-content { flex: 1; }
+    .toast-title { font-weight: 600; font-size: 14px; color: #fffffe; margin-bottom: 2px; }
+    .toast-message { font-size: 13px; color: #94a1b2; }
+    .toast-close { background: none; border: none; color: #94a1b2; font-size: 16px; cursor: pointer; }
+    .toast-close:hover { color: #fffffe; }
+
+    #offline-indicator {
+      position: fixed; top: 0; left: 0; width: 100%; padding: 10px;
+      background: #fbbf24; color: #000; text-align: center;
+      font-size: 14px; font-weight: 600; z-index: 9998;
+      transform: translateY(-100%); transition: transform 0.3s ease;
+    }
+    #offline-indicator.visible { transform: translateY(0); }
+
+    @media (max-width: 768px) {
+      .filters-bar { flex-direction: column; }
+      .search-box { min-width: 100%; }
+      #toast-container { left: 10px; right: 10px; max-width: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="logo">📊 EduPredict</div>
+    <a href="results.html" class="active">Результаты</a>
+    <a href="statistics.html">Статистика</a>
+  </nav>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>Результаты предсказаний</h1>
+      <p>Таблица предсказанного количества задолженностей по студентам</p>
+    </div>
+
+    <div class="actions-bar">
+      <button class="btn btn-outline" onclick="exportFromBackend()">⬇ Экспорт Excel</button>
+    </div>
+
+    <div class="filters-bar">
+      <div class="search-box">
+        <input type="text" id="search-input" placeholder="Поиск по хешу или номеру ЛД...">
+      </div>
+      <select class="filter-select" id="filter-debt">
+        <option value="">Все долги</option>
+        <option value="0">0 долгов</option>
+        <option value="1">1 долг</option>
+        <option value="2">2 долга</option>
+        <option value="3">3+ долгов</option>
+      </select>
+    </div>
+
+    <div class="table-card">
+      <div class="table-wrapper" id="table-wrapper">
+        <div id="table-skeleton"></div>
+        <table id="data-table" style="display: none;">
+          <thead>
+            <tr>
+              <th data-sort="index">#<span class="sort-icon">▲▼</span></th>
+              <th data-sort="hash">Хеш студента<span class="sort-icon">▲▼</span></th>
+              <th data-sort="record_number">Номер ЛД<span class="sort-icon">▲▼</span></th>
+              <th data-sort="debt">Предсказанные долги<span class="sort-icon">▲▼</span></th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+        <div id="empty-state-container"></div>
+      </div>
+      <div class="table-footer">
+        <span id="table-info">Показано 0 из 0</span>
+        <div class="pagination" id="pagination"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/toast.js"></script>
+  <script src="js/utils.js"></script>
+
+  <script>
+    const API_BASE_URL = 'http://localhost:8000';
+
+    let allData = [];
+
+    showSkeleton('table-skeleton', 8, 4);
+
+    setTimeout(() => {
+      try {
+        const raw = localStorage.getItem('predictionData');
+        if (!raw) {
+          showEmptyState('empty-state-container', '📭', 'Нет данных', 'Загрузите файл и запустите предсказание на главной странице.');
+          hideSkeleton('table-skeleton');
+          return;
+        }
+
+        const parsed = JSON.parse(raw);
+        allData = parsed;
+
+        if (allData.length === 0) {
+          showEmptyState('empty-state-container', '📭', 'Нет данных', 'Загрузите файл для получения результатов.');
+        } else {
+          // Удаляем заглушки
+          document.getElementById('table-skeleton').innerHTML = '';
+          document.getElementById('table-skeleton').classList.remove('skeleton-active');
+          
+          // Показываем таблицу
+          document.getElementById('data-table').style.display = 'table';
+          initTable();
+        }
+      } catch (e) {
+        console.error(e);
+        showEmptyState('empty-state-container', '💥', 'Ошибка загрузки', 'Не удалось прочитать данные.');
+        showToast('Ошибка при загрузке данных', 'error', 5000);
+      } finally {
+        // Убедимся, что заглушки скрыты
+        hideSkeleton('table-skeleton');
+      }
+    }, 800);
+
+    const ROWS_PER_PAGE = 15;
+    let filteredData = [];
+    let currentPage = 1;
+    let sortColumn = null;
+    let sortDirection = 'asc';
+
+    const tableBody = document.getElementById('table-body');
+    const dataTable = document.getElementById('data-table');
+    const tableInfo = document.getElementById('table-info');
+    const paginationDiv = document.getElementById('pagination');
+    const searchInput = document.getElementById('search-input');
+    const filterDebt = document.getElementById('filter-debt');
+
+    function initTable() {
+      filteredData = [...allData];
+      render();
+    }
+
+    function applyFilters() {
+      const query = searchInput.value.toLowerCase().trim();
+      const debt = filterDebt.value;
+
+      filteredData = allData.filter(item => {
+        if (query) {
+          const matchHash = item.hash.toLowerCase().includes(query);
+          const matchRecord = (item.record_number || '').toLowerCase().includes(query);
+          if (!matchHash && !matchRecord) return false;
+        }
+        if (debt !== '' && item.debt !== parseInt(debt)) return false;
+        return true;
+      });
+
+      if (filteredData.length === 0 && allData.length > 0) {
+        showEmptyState('empty-state-container', '🔍', 'Ничего не найдено', 'Попробуйте изменить параметры фильтрации.');
+        dataTable.style.display = 'none';
+      } else {
+        document.getElementById('empty-state-container').innerHTML = '';
+        dataTable.style.display = 'table';
+      }
+
+      if (sortColumn) applySorting();
+      currentPage = 1;
+      render();
+    }
+
+    searchInput.addEventListener('input', applyFilters);
+    filterDebt.addEventListener('change', applyFilters);
+
+    document.querySelectorAll('thead th[data-sort]').forEach(th => {
+      th.addEventListener('click', () => {
+        const col = th.dataset.sort;
+        if (sortColumn === col) {
+          sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+          sortColumn = col;
+          sortDirection = 'asc';
+        }
+        document.querySelectorAll('thead th').forEach(h => h.classList.remove('sorted'));
+        th.classList.add('sorted');
+        th.querySelector('.sort-icon').textContent = sortDirection === 'asc' ? '▲' : '▼';
+        applySorting();
+        render();
+      });
+    });
+
+    function applySorting() {
+      filteredData.sort((a, b) => {
+        let va, vb;
+        switch (sortColumn) {
+          case 'index': va = allData.indexOf(a); vb = allData.indexOf(b); break;
+          case 'hash': va = a.hash; vb = b.hash; break;
+          case 'record_number': va = a.record_number || ''; vb = b.record_number || ''; break;
+          case 'debt': va = a.debt; vb = b.debt; break;
+          default: return 0;
+        }
+        if (va < vb) return sortDirection === 'asc' ? -1 : 1;
+        if (va > vb) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    function render() {
+      const totalPages = Math.ceil(filteredData.length / ROWS_PER_PAGE) || 1;
+      if (currentPage > totalPages) currentPage = totalPages;
+
+      const start = (currentPage - 1) * ROWS_PER_PAGE;
+      const end = start + ROWS_PER_PAGE;
+      const pageData = filteredData.slice(start, end);
+
+      tableBody.innerHTML = pageData.map((item, i) => {
+        const debtLabel = item.debt >= 3 ? '3+' : item.debt;
+        const debtClass = item.debt >= 3 ? 'debt-3' : `debt-${item.debt}`;
+        return `
+          <tr>
+            <td style="color:#94a1b2">${start + i + 1}</td>
+            <td class="hash-cell">${item.hash}</td>
+            <td class="record-cell">${item.record_number}</td>
+            <td><span class="debt-badge ${debtClass}">${debtLabel}</span></td>
+          </tr>
+        `;
+      }).join('');
+
+      tableInfo.textContent = `Показано ${filteredData.length > 0 ? start + 1 : 0}–${Math.min(end, filteredData.length)} из ${filteredData.length}`;
+      renderPagination(totalPages);
+    }
+
+    function renderPagination(totalPages) {
+      paginationDiv.innerHTML = '';
+
+      const prevBtn = document.createElement('button');
+      prevBtn.textContent = '←';
+      prevBtn.disabled = currentPage === 1;
+      prevBtn.onclick = () => { currentPage--; render(); };
+      paginationDiv.appendChild(prevBtn);
+
+      let pages = [];
+      if (totalPages <= 7) {
+        pages = Array.from({length: totalPages}, (_, i) => i + 1);
+      } else {
+        pages = [1];
+        if (currentPage > 3) pages.push('...');
+        for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) pages.push(i);
+        if (currentPage < totalPages - 2) pages.push('...');
+        pages.push(totalPages);
+      }
+
+      pages.forEach(p => {
+        if (p === '...') {
+          const span = document.createElement('button');
+          span.textContent = '…';
+          span.disabled = true;
+          span.style.border = 'none';
+          span.style.background = 'transparent';
+          paginationDiv.appendChild(span);
+        } else {
+          const btn = document.createElement('button');
+          btn.textContent = p;
+          if (p === currentPage) btn.classList.add('active');
+          btn.onclick = () => { currentPage = p; render(); };
+          paginationDiv.appendChild(btn);
+        }
+      });
+
+      const nextBtn = document.createElement('button');
+      nextBtn.textContent = '→';
+      nextBtn.disabled = currentPage === totalPages;
+      nextBtn.onclick = () => { currentPage++; render(); };
+      paginationDiv.appendChild(nextBtn);
+    }
+
+    async function exportFromBackend() {
+      const uploadId = localStorage.getItem('currentUploadId');
+      if (!uploadId) {
+        showToast('Нет активной загрузки', 'warning', 3000);
+        return;
+      }
+
+      try {
+        showToast('Подготовка экспорта...', 'info', 2000);
+
+        const response = await fetch(`${API_BASE_URL}/export?upload_id=${uploadId}`);
+        if (!response.ok) throw new Error('Ошибка экспорта');
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${uploadId}_result.xlsx`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        showToast('Файл экспортирован', 'success', 3000);
+      } catch (error) {
+        console.error(error);
+        showToast('Ошибка при экспорте', 'error', 4000);
+      }
+    }
+
+    setupOfflineIndicator();
+  </script>
+</body>
+</html>
