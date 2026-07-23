@@ -1,0 +1,48 @@
+Вход: data\data_dataset_train.csv
+Train: 13682 строк, Test: 3421 строк
+
+============================================================
+Random Forest
+============================================================
+              precision    recall  f1-score   support
+
+           0       0.94      0.81      0.87      2693
+           1       0.22      0.33      0.27       297
+           2       0.15      0.29      0.19       133
+          3+       0.51      0.70      0.59       298
+
+    accuracy                           0.74      3421
+   macro avg       0.46      0.53      0.48      3421
+weighted avg       0.81      0.74      0.77      3421
+Accuracy:    0.7407
+Macro F1:    0.4820  (критерий приёмки: >= 0.70)
+Weighted F1: 0.7702
+Recall для класса '3+' (высокий риск): 0.7013
+Матрица ошибок (строки=факт, столбцы=прогноз), порядок ['0', '1', '2', '3+']:
+[[2189  275  127  102]
+ [  89   98   58   52]
+ [  14   38   38   43]
+ [  25   30   34  209]]
+
+--- Важность признаков (Random Forest) ---
+group_difficulty                    0.2002
+avg_discipline_difficulty           0.0989
+avg_score                           0.0826
+n_debts                             0.0763
+prev_avg_score                      0.0591
+n_neyavka                           0.0520
+specialty_difficulty                0.0507
+n_udovl                             0.0493
+score_trend                         0.0476
+semester_number                     0.0451
+n_records                           0.0360
+n_distinct_disciplines              0.0343
+n_horosho                           0.0339
+n_otlichno                          0.0315
+n_zachteno                          0.0214
+n_zachet_rows                       0.0204
+share_zachteno                      0.0191
+n_nezachteno                        0.0141
+n_retake_rows_in_semester           0.0115
+n_neudovl                           0.0084
+has_retake_in_semester              0.0077

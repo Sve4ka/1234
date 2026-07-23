@@ -1,4 +1,3 @@
-from importlib import import_module
 from pathlib import Path
 from uuid import UUID, uuid4
 
@@ -19,6 +18,7 @@ from backend.db.db import (
     update_upload_status,
 )
 from backend.db.migration import run_migrations
+from src.predict import run_inference
 
 
 app = FastAPI(
@@ -31,8 +31,8 @@ MOCK_RESPONSE = {
     "status": "completed",
     "predictions": [
         {
-            "student_id": "1001",
-            "student_name": "Иванов Иван Иванович",
+            "student_hash": "hash_1001",
+            "record_number": "1001",
             "predicted_class": "3+",
             "probability_0": 0.05,
             "probability_1": 0.10,
@@ -40,8 +40,8 @@ MOCK_RESPONSE = {
             "probability_3_plus": 0.65,
         },
         {
-            "student_id": "1002",
-            "student_name": "Петров Пётр Петрович",
+            "student_hash": "hash_1002",
+            "record_number": "1002",
             "predicted_class": "2",
             "probability_0": 0.10,
             "probability_1": 0.15,
@@ -49,8 +49,8 @@ MOCK_RESPONSE = {
             "probability_3_plus": 0.10,
         },
         {
-            "student_id": "1003",
-            "student_name": "Сидорова Анна Сергеевна",
+            "student_hash": "hash_1003",
+            "record_number": "1003",
             "predicted_class": "0",
             "probability_0": 0.80,
             "probability_1": 0.10,
@@ -122,6 +122,22 @@ def upload_file(
                 "Excel-файл не содержит данных"
             )
 
+        required_columns = {
+            "hash",
+            "Номер ЛД",
+        }
+
+        missing_columns = (
+            required_columns
+            - set(dataframe.columns)
+        )
+
+        if missing_columns:
+            raise ValueError(
+                "В Excel отсутствуют обязательные колонки: "
+                + ", ".join(sorted(missing_columns))
+            )
+
         create_upload(
             upload_id=upload_id,
             original_filename=file.filename,
@@ -165,43 +181,12 @@ def predict_mock() -> dict:
     return MOCK_RESPONSE
 
 
-def call_ml_prediction(
-    file_path: Path,
-) -> list[dict]:
-    try:
-        ml_module = import_module("ml.inference")
-    except ModuleNotFoundError as error:
-        raise RuntimeError(
-            "ML-модуль ml.inference ещё не подключён"
-        ) from error
-
-    predict_file = getattr(
-        ml_module,
-        "predict_file",
-        None,
-    )
-
-    if not callable(predict_file):
-        raise RuntimeError(
-            "В ml.inference отсутствует функция predict_file"
-        )
-
-    result = predict_file(str(file_path))
-
-    if not isinstance(result, list):
-        raise TypeError(
-            "predict_file должна вернуть list[dict]"
-        )
-
-    return result
-
-
 def validate_predictions(
     predictions: list[dict],
 ) -> None:
     required_fields = {
-        "student_id",
-        "student_name",
+        "student_hash",
+        "record_number",
         "predicted_class",
         "probability_0",
         "probability_1",
@@ -238,6 +223,24 @@ def validate_predictions(
                 + ", ".join(sorted(missing_fields))
             )
 
+        student_hash = str(
+            prediction["student_hash"]
+        ).strip()
+
+        record_number = str(
+            prediction["record_number"]
+        ).strip()
+
+        if not student_hash:
+            raise ValueError(
+                f"В прогнозе {index} отсутствует hash"
+            )
+
+        if not record_number:
+            raise ValueError(
+                f"В прогнозе {index} отсутствует номер ЛД"
+            )
+
         predicted_class = str(
             prediction["predicted_class"]
         )
@@ -246,6 +249,8 @@ def validate_predictions(
             raise ValueError(
                 f"Недопустимый класс: {predicted_class}"
             )
+
+        probability_sum = 0.0
 
         for field in (
             "probability_0",
@@ -259,6 +264,179 @@ def validate_predictions(
                 raise ValueError(
                     f"{field} должна находиться от 0 до 1"
                 )
+
+            probability_sum += value
+
+        if not 0.99 <= probability_sum <= 1.01:
+            raise ValueError(
+                f"Сумма вероятностей прогноза {index} "
+                "должна быть равна 1"
+            )
+
+
+def prepare_predictions(
+    result: pd.DataFrame,
+    source_dataframe: pd.DataFrame,
+) -> list[dict]:
+    required_ml_columns = {
+        "hash",
+        "predicted_category",
+        "probability_0",
+        "probability_1",
+        "probability_2",
+        "probability_3+",
+    }
+
+    missing_ml_columns = (
+        required_ml_columns
+        - set(result.columns)
+    )
+
+    if missing_ml_columns:
+        raise ValueError(
+            "В результате ML отсутствуют колонки: "
+            + ", ".join(sorted(missing_ml_columns))
+        )
+
+    required_source_columns = {
+        "hash",
+        "Номер ЛД",
+    }
+
+    missing_source_columns = (
+        required_source_columns
+        - set(source_dataframe.columns)
+    )
+
+    if missing_source_columns:
+        raise ValueError(
+            "В исходном Excel отсутствуют колонки: "
+            + ", ".join(sorted(missing_source_columns))
+        )
+
+    ml_result = result.copy()
+    source_students = source_dataframe[
+        [
+            "hash",
+            "Номер ЛД",
+        ]
+    ].copy()
+
+    # Приводим hash к строке с обеих сторон,
+    # чтобы merge не ломался из-за разных типов.
+    ml_result["hash"] = (
+        ml_result["hash"]
+        .astype(str)
+        .str.strip()
+    )
+
+    source_students["hash"] = (
+        source_students["hash"]
+        .astype(str)
+        .str.strip()
+    )
+
+    source_students["Номер ЛД"] = (
+        source_students["Номер ЛД"]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+    )
+
+    # В исходном Excel один студент может встречаться
+    # несколько раз по разным дисциплинам.
+    source_students = source_students.drop_duplicates(
+        subset=["hash"]
+    )
+
+    # Если ML уже вернул Номер ЛД, удаляем его,
+    # чтобы источником номера ЛД всегда был исходный Excel.
+    if "Номер ЛД" in ml_result.columns:
+        ml_result = ml_result.drop(
+            columns=["Номер ЛД"]
+        )
+
+    merged_result = ml_result.merge(
+        source_students,
+        on="hash",
+        how="left",
+        validate="many_to_one",
+    )
+
+    missing_record_numbers = merged_result[
+        "Номер ЛД"
+    ].isna() | merged_result["Номер ЛД"].eq("")
+
+    if missing_record_numbers.any():
+        missing_hashes = (
+            merged_result.loc[
+                missing_record_numbers,
+                "hash",
+            ]
+            .astype(str)
+            .tolist()
+        )
+
+        raise ValueError(
+            "Для следующих hash не найден номер ЛД: "
+            + ", ".join(missing_hashes)
+        )
+
+    merged_result = merged_result.rename(
+        columns={
+            "hash": "student_hash",
+            "Номер ЛД": "record_number",
+            "predicted_category": "predicted_class",
+            "probability_3+": "probability_3_plus",
+        }
+    )
+
+    predictions = merged_result[
+        [
+            "student_hash",
+            "record_number",
+            "predicted_class",
+            "probability_0",
+            "probability_1",
+            "probability_2",
+            "probability_3_plus",
+        ]
+    ].to_dict(
+        orient="records"
+    )
+
+    normalized_predictions = [
+        {
+            "student_hash": str(
+                prediction["student_hash"]
+            ),
+            "record_number": str(
+                prediction["record_number"]
+            ),
+            "predicted_class": str(
+                prediction["predicted_class"]
+            ),
+            "probability_0": float(
+                prediction["probability_0"]
+            ),
+            "probability_1": float(
+                prediction["probability_1"]
+            ),
+            "probability_2": float(
+                prediction["probability_2"]
+            ),
+            "probability_3_plus": float(
+                prediction["probability_3_plus"]
+            ),
+        }
+        for prediction in predictions
+    ]
+
+    validate_predictions(
+        normalized_predictions
+    )
+
+    return normalized_predictions
 
 
 @app.post("/predict/{upload_id}")
@@ -293,48 +471,38 @@ def predict(
     update_upload_status(
         upload_id=upload_id,
         status="processing",
+        error_message=None,
     )
 
     try:
-        predictions = call_ml_prediction(file_path) # todo подключить функцию
+        result = run_inference(
+            str(file_path)
+        )
 
-        validate_predictions(predictions)
+        if not isinstance(result, pd.DataFrame):
+            raise TypeError(
+                "run_inference должна вернуть pandas.DataFrame"
+            )
 
-        normalized_predictions = [
-            {
-                "student_id": str(
-                    prediction["student_id"]
-                ),
-                "student_name": str(
-                    prediction["student_name"]
-                ),
-                "predicted_class": str(
-                    prediction["predicted_class"]
-                ),
-                "probability_0": float(
-                    prediction["probability_0"]
-                ),
-                "probability_1": float(
-                    prediction["probability_1"]
-                ),
-                "probability_2": float(
-                    prediction["probability_2"]
-                ),
-                "probability_3_plus": float(
-                    prediction["probability_3_plus"]
-                ),
-            }
-            for prediction in predictions
-        ]
+        source_dataframe = pd.read_excel(
+            file_path,
+            engine="openpyxl",
+        )
+
+        predictions = prepare_predictions(
+            result=result,
+            source_dataframe=source_dataframe,
+        )
 
         save_predictions(
             upload_id=upload_id,
-            predictions=normalized_predictions,
+            predictions=predictions,
         )
 
         update_upload_status(
             upload_id=upload_id,
             status="completed",
+            error_message=None,
         )
 
     except Exception as error:
@@ -352,9 +520,7 @@ def predict(
     return {
         "upload_id": upload_id,
         "status": "completed",
-        "predictions_count": len(
-            normalized_predictions
-        ),
+        "predictions_count": len(predictions),
     }
 
 
@@ -376,6 +542,15 @@ def predictions(
             detail="Прогноз ещё выполняется",
         )
 
+    if upload["status"] == "failed":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Прогноз завершился с ошибкой",
+                "error": upload["error_message"],
+            },
+        )
+
     result = get_predictions(upload_id)
 
     return {
@@ -385,73 +560,6 @@ def predictions(
     }
 
 
-@app.get("/export")
-def export_predictions(
-    upload_id: UUID,
-) -> FileResponse:
-    upload = get_upload(upload_id)
-
-    if upload is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Загрузка не найдена",
-        )
-
-    if upload["status"] != "completed":
-        raise HTTPException(
-            status_code=409,
-            detail="Прогноз ещё не выполнен",
-        )
-
-    predictions = get_predictions(upload_id)
-
-    if not predictions:
-        raise HTTPException(
-            status_code=404,
-            detail="Результаты прогноза не найдены",
-        )
-
-    dataframe = pd.DataFrame(predictions)
-
-    dataframe = dataframe.rename(
-        columns={
-            "student_id": "ID студента",
-            "student_name": "ФИО студента",
-            "predicted_class": "Прогноз",
-            "probability_0": "Вероятность 0",
-            "probability_1": "Вероятность 1",
-            "probability_2": "Вероятность 2",
-            "probability_3_plus": "Вероятность 3+",
-        }
-    )
-
-    result_filename = f"{upload_id}_result.xlsx"
-    result_path = UPLOAD_DIR / result_filename
-
-    try:
-        dataframe.to_excel(
-            result_path,
-            index=False,
-            engine="openpyxl",
-        )
-
-    except Exception as error:
-        result_path.unlink(missing_ok=True)
-
-        raise HTTPException(
-            status_code=500,
-            detail=f"Ошибка экспорта: {error}",
-        ) from error
-
-    return FileResponse(
-        path=result_path,
-        filename=result_filename,
-        media_type=(
-            "application/vnd.openxmlformats-officedocument"
-            ".spreadsheetml.sheet"
-        ),
-    )
-
 @app.get("/export/mock")
 def export_mock() -> FileResponse:
     predictions = MOCK_RESPONSE["predictions"]
@@ -460,8 +568,8 @@ def export_mock() -> FileResponse:
 
     dataframe = dataframe.rename(
         columns={
-            "student_id": "ID студента",
-            "student_name": "ФИО студента",
+            "student_hash": "Hash",
+            "record_number": "Номер ЛД",
             "predicted_class": "Прогноз",
             "probability_0": "Вероятность 0",
             "probability_1": "Вероятность 1",
@@ -486,6 +594,99 @@ def export_mock() -> FileResponse:
         raise HTTPException(
             status_code=500,
             detail=f"Ошибка mock-экспорта: {error}",
+        ) from error
+
+    return FileResponse(
+        path=result_path,
+        filename=result_filename,
+        media_type=(
+            "application/vnd.openxmlformats-officedocument"
+            ".spreadsheetml.sheet"
+        ),
+    )
+
+
+@app.get("/export")
+def export_predictions(
+    upload_id: UUID,
+) -> FileResponse:
+    upload = get_upload(upload_id)
+
+    if upload is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Загрузка не найдена",
+        )
+
+    if upload["status"] == "processing":
+        raise HTTPException(
+            status_code=409,
+            detail="Прогноз ещё выполняется",
+        )
+
+    if upload["status"] == "failed":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "Прогноз завершился с ошибкой",
+                "error": upload["error_message"],
+            },
+        )
+
+    if upload["status"] != "completed":
+        raise HTTPException(
+            status_code=409,
+            detail="Прогноз ещё не выполнен",
+        )
+
+    predictions_result = get_predictions(
+        upload_id
+    )
+
+    if not predictions_result:
+        raise HTTPException(
+            status_code=404,
+            detail="Результаты прогноза не найдены",
+        )
+
+    dataframe = pd.DataFrame(
+        predictions_result
+    )
+
+    dataframe = dataframe.rename(
+        columns={
+            "student_hash": "Hash",
+            "record_number": "Номер ЛД",
+            "predicted_class": "Прогноз",
+            "probability_0": "Вероятность 0",
+            "probability_1": "Вероятность 1",
+            "probability_2": "Вероятность 2",
+            "probability_3_plus": "Вероятность 3+",
+        }
+    )
+
+    result_filename = (
+        f"{upload_id}_result.xlsx"
+    )
+
+    result_path = (
+        UPLOAD_DIR
+        / result_filename
+    )
+
+    try:
+        dataframe.to_excel(
+            result_path,
+            index=False,
+            engine="openpyxl",
+        )
+
+    except Exception as error:
+        result_path.unlink(missing_ok=True)
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка экспорта: {error}",
         ) from error
 
     return FileResponse(

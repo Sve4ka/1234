@@ -24,11 +24,23 @@
        data/dataset_predict.csv
 """
 
+import argparse
+import os
+
 from features import build_features
 
 INPUT_PATH = "data/data.xlsx"
 TRAIN_OUTPUT_PATH = "data/dataset_train.csv"
 PREDICT_OUTPUT_PATH = "data/dataset_predict.csv"
+
+
+def _default_output_paths(input_path: str):
+    """По имени входного файла строит имена выходных train/predict файлов,
+    чтобы разные загрузки не перезаписывали друг друга."""
+    base = os.path.splitext(os.path.basename(input_path))[0]
+    train_path = os.path.join("data", f"{base}_dataset_train.csv")
+    predict_path = os.path.join("data", f"{base}_dataset_predict.csv")
+    return train_path, predict_path
 
 
 def build_final_dataset(path: str = INPUT_PATH):
@@ -39,7 +51,7 @@ def build_final_dataset(path: str = INPUT_PATH):
     df_predict — последний семестр каждого студента (таргет неизвестен,
                  это и есть прогнозная выборка "перед сессией").
     """
-    features = build_features(path)
+    features = build_features(path, save_maps=True)
 
     has_target = features["target_category"].notna()
     df_train = features[has_target].reset_index(drop=True)
@@ -48,9 +60,37 @@ def build_final_dataset(path: str = INPUT_PATH):
     return df_train, df_predict
 
 
-def main():
-    df_train, df_predict = build_final_dataset(INPUT_PATH)
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Формирует финальный датасет (train/predict) из "
+                    "Excel-файла с оценками."
+    )
+    parser.add_argument(
+        "--input", "-i", default=INPUT_PATH,
+        help=f"Путь к входному Excel-файлу (по умолчанию: {INPUT_PATH})"
+    )
+    parser.add_argument(
+        "--train-output", default=None,
+        help="Путь к выходному train CSV. Если не указан — строится "
+             "автоматически по имени входного файла."
+    )
+    parser.add_argument(
+        "--predict-output", default=None,
+        help="Путь к выходному predict CSV. Если не указан — строится "
+             "автоматически по имени входного файла."
+    )
+    return parser.parse_args()
 
+
+def main():
+    args = parse_args()
+    default_train, default_predict = _default_output_paths(args.input)
+    train_output = args.train_output or default_train
+    predict_output = args.predict_output or default_predict
+
+    df_train, df_predict = build_final_dataset(args.input)
+
+    print(f"Вход: {args.input}")
     print(f"Финальный датасет для обучения (df_train): "
           f"{df_train.shape[0]} строк, {df_train.shape[1]} столбцов")
     print("\n--- Распределение таргета в обучающей выборке ---")
@@ -65,9 +105,9 @@ def main():
     total = df_train.shape[0] + df_predict.shape[0]
     print(f"\nПроверка: {df_train.shape[0]} + {df_predict.shape[0]} = {total}")
 
-    df_train.to_csv(TRAIN_OUTPUT_PATH, index=False, encoding="utf-8-sig")
-    df_predict.to_csv(PREDICT_OUTPUT_PATH, index=False, encoding="utf-8-sig")
-    print(f"\nСохранено:\n  {TRAIN_OUTPUT_PATH}\n  {PREDICT_OUTPUT_PATH}")
+    df_train.to_csv(train_output, index=False, encoding="utf-8-sig")
+    df_predict.to_csv(predict_output, index=False, encoding="utf-8-sig")
+    print(f"\nСохранено:\n  {train_output}\n  {predict_output}")
 
 
 if __name__ == "__main__":

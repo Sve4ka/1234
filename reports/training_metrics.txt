@@ -1,0 +1,197 @@
+Вход: data\data_dataset_train.csv
+Train (после отделения holdout-теста): 13682 строк
+Test (holdout, самые поздние семестры): 3421 строк
+
+============================================================
+XGBoost (class_weight)
+============================================================
+              precision    recall  f1-score   support
+
+           0       0.95      0.76      0.85      2693
+           1       0.21      0.38      0.27       297
+           2       0.12      0.29      0.17       133
+          3+       0.50      0.67      0.57       298
+
+    accuracy                           0.70      3421
+   macro avg       0.45      0.53      0.47      3421
+weighted avg       0.82      0.70      0.75      3421
+Accuracy:    0.7045
+Macro F1:    0.4663  (критерий приёмки: >= 0.70)
+Weighted F1: 0.7479
+Recall для класса '3+' (высокий риск): 0.6745
+Матрица ошибок (строки=факт, столбцы=прогноз), порядок ['0', '1', '2', '3+']:
+[[2056  338  188  111]
+ [  69  114   61   53]
+ [  13   43   39   38]
+ [  18   39   40  201]]
+
+--- Важность признаков (XGBoost (class_weight)) ---
+n_debts                             0.2055
+semester_number                     0.0886
+group_difficulty                    0.0864
+n_neyavka                           0.0522
+avg_score                           0.0466
+share_zachteno                      0.0438
+avg_discipline_difficulty           0.0428
+specialty_difficulty                0.0422
+n_distinct_disciplines              0.0395
+n_zachteno                          0.0389
+prev_avg_score                      0.0388
+n_records                           0.0380
+n_udovl                             0.0345
+n_retake_rows_in_semester           0.0321
+score_trend                         0.0299
+n_neudovl                           0.0296
+n_zachet_rows                       0.0293
+n_otlichno                          0.0291
+n_horosho                           0.0291
+n_nezachteno                        0.0229
+has_retake_in_semester              0.0000
+
+============================================================
+CatBoost (class_weight)
+============================================================
+              precision    recall  f1-score   support
+
+           0       0.95      0.75      0.84      2693
+           1       0.19      0.37      0.25       297
+           2       0.15      0.32      0.20       133
+          3+       0.48      0.71      0.57       298
+
+    accuracy                           0.69      3421
+   macro avg       0.44      0.54      0.47      3421
+weighted avg       0.81      0.69      0.74      3421
+Accuracy:    0.6948
+Macro F1:    0.4654  (критерий приёмки: >= 0.70)
+Weighted F1: 0.7382
+Recall для класса '3+' (высокий риск): 0.7114
+Матрица ошибок (строки=факт, столбцы=прогноз), порядок ['0', '1', '2', '3+']:
+[[2013  394  152  134]
+ [  74  110   58   55]
+ [  13   36   42   42]
+ [  19   30   37  212]]
+
+--- Важность признаков (CatBoost (class_weight)) ---
+group_difficulty                    15.3568
+avg_discipline_difficulty           10.3162
+specialty_difficulty                6.7729
+semester_number                     6.5186
+avg_score                           5.9911
+n_udovl                             5.8644
+prev_avg_score                      5.7794
+n_horosho                           5.2702
+n_debts                             5.1782
+score_trend                         4.5471
+n_distinct_disciplines              4.3507
+n_neyavka                           4.2108
+n_records                           3.9201
+n_otlichno                          3.4569
+n_zachteno                          2.7192
+n_zachet_rows                       2.4670
+has_retake_in_semester              2.3599
+n_neudovl                           1.5971
+n_retake_rows_in_semester           1.3603
+share_zachteno                      1.2626
+n_nezachteno                        0.7003
+
+============================================================
+XGBoost (SMOTE)
+============================================================
+              precision    recall  f1-score   support
+
+           0       0.94      0.81      0.87      2693
+           1       0.23      0.32      0.27       297
+           2       0.14      0.30      0.19       133
+          3+       0.52      0.67      0.58       298
+
+    accuracy                           0.73      3421
+   macro avg       0.45      0.53      0.48      3421
+weighted avg       0.81      0.73      0.76      3421
+Accuracy:    0.7337
+Macro F1:    0.4764  (критерий приёмки: >= 0.70)
+Weighted F1: 0.7638
+Recall для класса '3+' (высокий риск): 0.6745
+Матрица ошибок (строки=факт, столбцы=прогноз), порядок ['0', '1', '2', '3+']:
+[[2174  246  162  111]
+ [ 103   95   57   42]
+ [  18   39   40   36]
+ [  28   32   37  201]]
+
+--- Важность признаков (XGBoost (SMOTE)) ---
+n_debts                             0.2250
+group_difficulty                    0.1045
+semester_number                     0.0598
+avg_discipline_difficulty           0.0495
+n_neyavka                           0.0462
+n_zachteno                          0.0445
+n_distinct_disciplines              0.0424
+specialty_difficulty                0.0422
+n_otlichno                          0.0421
+avg_score                           0.0420
+n_retake_rows_in_semester           0.0379
+n_horosho                           0.0361
+n_records                           0.0329
+prev_avg_score                      0.0311
+n_zachet_rows                       0.0297
+n_udovl                             0.0281
+share_zachteno                      0.0278
+has_retake_in_semester              0.0271
+score_trend                         0.0206
+n_neudovl                           0.0194
+n_nezachteno                        0.0110
+
+============================================================
+CatBoost (SMOTE)
+============================================================
+              precision    recall  f1-score   support
+
+           0       0.95      0.77      0.85      2693
+           1       0.22      0.39      0.28       297
+           2       0.13      0.27      0.17       133
+          3+       0.47      0.66      0.55       298
+
+    accuracy                           0.71      3421
+   macro avg       0.44      0.52      0.46      3421
+weighted avg       0.81      0.71      0.75      3421
+Accuracy:    0.7080
+Macro F1:    0.4627  (критерий приёмки: >= 0.70)
+Weighted F1: 0.7478
+Recall для класса '3+' (высокий риск): 0.6611
+Матрица ошибок (строки=факт, столбцы=прогноз), порядок ['0', '1', '2', '3+']:
+[[2074  334  158  127]
+ [  80  115   51   51]
+ [  13   42   36   42]
+ [  21   38   42  197]]
+
+--- Важность признаков (CatBoost (SMOTE)) ---
+group_difficulty                    13.2643
+avg_discipline_difficulty           9.8622
+specialty_difficulty                8.6840
+n_horosho                           7.0590
+avg_score                           6.4555
+n_otlichno                          6.4337
+semester_number                     5.9814
+n_distinct_disciplines              5.9624
+prev_avg_score                      5.5035
+n_debts                             5.4551
+n_udovl                             5.2490
+n_records                           4.7596
+n_zachteno                          3.7486
+n_zachet_rows                       2.6208
+score_trend                         2.3953
+n_retake_rows_in_semester           2.3020
+has_retake_in_semester              1.8916
+n_neyavka                           1.3485
+share_zachteno                      0.9388
+n_neudovl                           0.0595
+n_nezachteno                        0.0253
+
+============================================================
+СРАВНЕНИЕ БАЛАНСИРОВКИ КЛАССОВ
+============================================================
+XGBoost (class_weight)         accuracy=0.7045  macro F1=0.4663  weighted F1=0.7479  recall(3+)=0.6745
+CatBoost (class_weight)        accuracy=0.6948  macro F1=0.4654  weighted F1=0.7382  recall(3+)=0.7114
+XGBoost (SMOTE)                accuracy=0.7337  macro F1=0.4764  weighted F1=0.7638  recall(3+)=0.6745
+CatBoost (SMOTE)               accuracy=0.7080  macro F1=0.4627  weighted F1=0.7478  recall(3+)=0.6611
+
+Лучший вариант: XGBoost (SMOTE) (macro F1 = 0.4764)
